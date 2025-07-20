@@ -1,14 +1,12 @@
 import streamlit as st
 import os
-import tempfile
-import pygame
 from datetime import datetime
 import logging
 from dotenv import load_dotenv
 
 # Import our custom modules
 from oppenheimer_persona import OppenheimerPersona
-from local_tts_service import LocalTTS  # <-- Import the new local TTS service
+from local_tts_service import LocalTTS
 
 # Load environment variables
 load_dotenv()
@@ -17,326 +15,672 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize pygame mixer for audio playback
-try:
-    pygame.mixer.init()
-except:
-    logger.warning("pygame mixer initialization failed - audio playback may not work")
-
+# Acts as a container for our initialized services
 class ConversationalTimeMachine:
     def __init__(self):
-        """Initialize the Conversational Time Machine."""
         self.persona = OppenheimerPersona()
-        self.tts = LocalTTS()  # <-- Use the new LocalTTS service
-        
-    def process_conversation(self, user_input):
-        """
-        Process a conversation turn: generate response and synthesize speech.
-        
-        Args:
-            user_input (str): User's question or comment
-            
-        Returns:
-            tuple: (text_response, audio_file_path, cost_info)
-        """
-        try:
-            # Generate Oppenheimer's text response
-            text_response = self.persona.generate_response(user_input)
-            
-            # Check if TTS should be used based on cost and length
-            should_use_tts = self.persona.optimizer.should_use_tts(text_response)
-            estimated_cost = self.persona.optimizer.get_cost_estimate(text_response)
-            
-            cost_info = {
-                'text_length': len(text_response),
-                'estimated_cost': estimated_cost,
-                'tts_enabled': should_use_tts,
-                'daily_usage': self.persona.optimizer.daily_usage
-            }
-            
-            audio_path = None
-            if should_use_tts:
-                # Generate audio response
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                audio_file = f"oppenheimer_response_{timestamp}.wav"
-                
-                try:
-                    # Use the local TTS service to synthesize speech
-                    audio_path = self.tts.synthesize(text_response, audio_file)
-                    logger.info(f"Local TTS generated: {len(text_response)} chars")
-                except Exception as tts_error:
-                    logger.warning(f"Local TTS failed: {tts_error}")
-                    cost_info['tts_enabled'] = False
-            else:
-                logger.info(f"TTS skipped for cost optimization: {len(text_response)} chars, ${estimated_cost:.4f}")
-            
-            return text_response, audio_path, cost_info
-                
-        except Exception as e:
-            logger.error(f"Conversation processing error: {e}")
-            error_response = "I find myself momentarily unable to respond. The burden of memory weighs heavily at times."
-            return error_response, None, {'error': True}
+        self.tts = LocalTTS()
 
 def main():
-    """Main Streamlit application."""
+    """Main Streamlit application with a robust streaming response implementation."""
     st.set_page_config(
         page_title="The Conversational Time Machine: J. Robert Oppenheimer",
         page_icon="⚛️",
         layout="wide"
     )
     
-    # Custom CSS for styling
+    # Modern minimalistic CSS with dark/light theme support
     st.markdown("""
     <style>
-    .main-header {
-        text-align: center;
-        padding: 2rem 0;
-        background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-    }
-    .oppenheimer-quote {
-        font-style: italic;
-        text-align: center;
-        color: #666;
-        padding: 1rem;
-        border-left: 3px solid #2a5298;
-        margin: 1rem 0;
-    }
-    .chat-container {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 1rem 0;
-    }
-    .user-message {
-        background: #e3f2fd;
-        padding: 0.5rem;
-        border-radius: 5px;
-        margin: 0.5rem 0;
-    }
-    .oppenheimer-message {
-        background: #fff3e0;
-        padding: 0.5rem;
-        border-radius: 5px;
-        margin: 0.5rem 0;
-        border-left: 3px solid #ff9800;
-    }
+        /* Import Inter font for modern look */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        
+        /* Enhanced light theme with more visual appeal */
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-subtle: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-muted: #94a3b8;
+            --border-color: #e2e8f0;
+            --border-light: #f1f5f9;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --accent-light: #dbeafe;
+            --user-bg: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            --user-border: #3b82f6;
+            --user-text: #1e40af;
+            --assistant-bg: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            --assistant-border: #d97706;
+            --assistant-text: #92400e;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            --glow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Override Streamlit's automatic dark theme detection - force light theme */
+        html, body, .stApp {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        
+        /* Dark theme only when explicitly set by user */
+        .stApp[data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border-color: #475569;
+            --user-bg: #1e3a8a;
+            --user-border: #3b82f6;
+            --assistant-bg: #422006;
+            --assistant-border: #f59e0b;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Global app styling */
+        .stApp {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        
+        /* Hide Streamlit branding */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        
+        /* Enhanced header with visual appeal */
+        .app-header {
+            position: relative;
+            text-align: center;
+            padding: 4rem 2rem 3rem 2rem;
+            margin-bottom: 3rem;
+            background: var(--bg-gradient);
+            background-size: 200% 200%;
+            animation: gradientShift 8s ease infinite;
+            border-radius: 0 0 2rem 2rem;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+        
+        .app-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            pointer-events: none;
+        }
+        
+        .app-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1rem;
+            letter-spacing: -0.03em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 2;
+        }
+        
+        .app-subtitle {
+            font-size: 1.25rem;
+            color: rgba(255,255,255,0.9);
+            font-weight: 400;
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.7;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 2;
+        }
+        
+        /* Decorative elements */
+        .app-header::after {
+            content: '⚛';
+            position: absolute;
+            top: 1rem;
+            right: 2rem;
+            font-size: 2rem;
+            opacity: 0.3;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        /* Enhanced chat container */
+        .chat-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+        }
+        
+        /* Enhanced message styling */
+        .message {
+            margin-bottom: 2rem;
+            opacity: 0;
+            animation: fadeInUp 0.6s ease forwards;
+            position: relative;
+        }
+        
+        .message-user {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 1.5rem;
+        }
+        
+        .message-assistant {
+            display: flex;
+            justify-content: flex-start;
+            margin-bottom: 2.5rem;
+            position: relative;
+        }
+        
+        .message-assistant::before {
+            content: 'Dr. Oppenheimer';
+            position: absolute;
+            top: -1.5rem;
+            left: 0;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--assistant-text);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .message-user::before {
+            content: 'You';
+            position: absolute;
+            top: -1.5rem;
+            right: 0;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--user-text);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .message-content {
+            max-width: 80%;
+            padding: 1.5rem 2rem;
+            border-radius: 1.5rem;
+            font-size: 1rem;
+            line-height: 1.7;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            backdrop-filter: blur(10px);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .message-content:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .message-user .message-content {
+            background: var(--user-bg);
+            border-color: var(--user-border);
+            color: var(--user-text);
+            border-bottom-right-radius: 0.5rem;
+            position: relative;
+        }
+        
+        .message-user .message-content::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: -8px;
+            width: 0;
+            height: 0;
+            border: 8px solid transparent;
+            border-top-color: var(--user-border);
+            border-left-color: var(--user-border);
+        }
+        
+        .message-assistant .message-content {
+            background: var(--assistant-bg);
+            border-color: var(--assistant-border);
+            color: var(--assistant-text);
+            border-bottom-left-radius: 0.5rem;
+            position: relative;
+        }
+        
+        .message-assistant .message-content::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: -8px;
+            width: 0;
+            height: 0;
+            border: 8px solid transparent;
+            border-top-color: var(--assistant-border);
+            border-right-color: var(--assistant-border);
+        }
+        
+        .message-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        /* Input section styling */
+        
+        /* Textarea styling */
+        .stTextArea > div > div > textarea {
+            background: var(--bg-secondary) !important;
+            border: 2px solid var(--border-color) !important;
+            border-radius: 1rem !important;
+            color: var(--text-primary) !important;
+            font-family: inherit !important;
+            font-size: 1rem !important;
+            padding: 1rem 1.5rem !important;
+            resize: none !important;
+            transition: all 0.3s ease !important;
+            box-shadow: var(--shadow) !important;
+            outline: none !important;
+        }
+        
+        .stTextArea > div > div > textarea:focus {
+            border-color: var(--accent-color) !important;
+            background: var(--bg-primary) !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1), var(--shadow) !important;
+            outline: none !important;
+        }
+        
+        .stTextArea > div > div > textarea::placeholder {
+            color: var(--text-muted) !important;
+            font-style: italic;
+        }
+        
+        /* Button styling */
+        .stButton > button {
+            background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 1rem !important;
+            padding: 1rem 2rem !important;
+            font-weight: 600 !important;
+            font-size: 1rem !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+            box-shadow: var(--shadow-md) !important;
+            height: auto !important;
+            min-height: 56px !important;
+            position: relative !important;
+            overflow: hidden !important;
+        }
+        
+        .stButton > button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .stButton > button:hover::before {
+            left: 100%;
+        }
+        
+        .stButton > button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: var(--shadow-lg), var(--glow) !important;
+        }
+        
+        .stButton > button:active {
+            transform: translateY(0) !important;
+        }
+        
+        /* Enhanced loading states */
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            padding: 2rem;
+            margin: 2rem 0;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 197, 253, 0.05) 100%);
+            border-radius: 1rem;
+            border: 1px solid var(--accent-light);
+            backdrop-filter: blur(10px);
+        }
+        
+        .typing-dots {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .typing-dots span {
+            width: 10px;
+            height: 10px;
+            background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-hover) 100%);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0s; }
+        
+        /* Enhanced audio player styling */
+        .stAudio {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 1rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-light);
+        }
+        
+        .stAudio > div {
+            background: transparent !important;
+            border: none !important;
+            border-radius: 1rem !important;
+        }
+        
+        /* Enhanced animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes typing {
+            0%, 80%, 100% { 
+                transform: scale(0.6); 
+                opacity: 0.4; 
+            }
+            40% { 
+                transform: scale(1.2); 
+                opacity: 1; 
+            }
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(180deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .app-title { font-size: 2rem; }
+            .app-subtitle { font-size: 1rem; }
+            .message-content { max-width: 95%; }
+            .input-section { padding: 1rem; }
+        }
+        
+        /* Streamlit element overrides for light theme */
+        .stTextArea > div > div > textarea::placeholder {
+            color: #94a3b8 !important;
+        }
+        
+        /* Sidebar styling */
+        .css-1d391kg { 
+            background: #f8fafc !important; 
+        }
+        .css-1d391kg .css-1v0mbdj { 
+            color: #1e293b !important; 
+        }
+        
+        /* Spinner styling */
+        .stSpinner > div {
+            border-color: #e2e8f0 #3b82f6 #e2e8f0 #e2e8f0 !important;
+        }
+        
+        /* Override any dark theme elements */
+        .stMarkdown, .stMarkdown p, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+            color: var(--text-primary) !important;
+        }
+        
+        /* Audio player styling */
+        .stAudio > div {
+            background: var(--bg-secondary) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 0.5rem !important;
+        }
+        
+        /* Container backgrounds */
+        .block-container {
+            background: transparent !important;
+        }
+        
+        /* Ensure all text is visible in light theme */
+        * {
+            color: inherit;
+        }
+        
+        /* Force light theme for all Streamlit components */
+        .stSelectbox > div > div {
+            background-color: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+        }
+        
+        .stTextInput > div > div > input {
+            background-color: var(--bg-secondary) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--border-color) !important;
+        }
+        
     </style>
     """, unsafe_allow_html=True)
     
-    # Header
-    st.markdown("""
-    <div class="main-header">
-        <h1>⚛️ The Conversational Time Machine</h1>
-        <h2>Speak with J. Robert Oppenheimer</h2>
-        <p>Experience a conversation with the "Father of the Atomic Bomb"</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Oppenheimer quote
-    st.markdown("""
-    <div class="oppenheimer-quote">
-        "Now I am become Death, the destroyer of worlds."<br>
-        — J. Robert Oppenheimer, recalling the Trinity test
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Initialize session state
+    # Initialize session state first
     if 'time_machine' not in st.session_state:
         st.session_state.time_machine = ConversationalTimeMachine()
         st.session_state.conversation_history = []
+        st.session_state.audio_job = None
         st.session_state.initialized = False
+        st.session_state.user_input = ""  # For clearing input after submit
     
-    # Introduction section
-    col1, col2 = st.columns([2, 1])
+    # Add JavaScript for enter-to-send functionality
+    st.markdown("""
+    <script>
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const buttons = document.querySelectorAll('[data-testid="stButton"] button');
+                if (buttons.length > 0) {
+                    buttons[0].click();
+                }
+            }
+        });
+    </script>
+    """, unsafe_allow_html=True)
     
-    with col1:
-        st.markdown("### About This Experience")
-        st.write("""
-        This application uses advanced AI to simulate a conversation with J. Robert Oppenheimer (1904-1967), 
-        the theoretical physicist who led the Manhattan Project. Through a combination of:
-        
-        - **RAG (Retrieval-Augmented Generation)**: Grounded in historical facts from his biography, quotes, and letters
-        - **Persona-Driven AI**: Responds in Oppenheimer's characteristic speaking style and perspective
-        - **Voice Synthesis**: Uses Google Cloud TTS to approximate his voice characteristics
-        
-        Ask about his life, the Manhattan Project, his thoughts on nuclear weapons, or his philosophical views.
-        """)
+    # Modern header with smart copy
+    st.markdown("""
+    <div class="app-header">
+        <h1 class="app-title">The Oppenheimer Conversations</h1>
+        <p class="app-subtitle">
+            Step into history and engage with the mind that changed the world forever. 
+            Ask J. Robert Oppenheimer about science, philosophy, moral responsibility, 
+            and the weight of discovery.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    with col2:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/JROppenheimer-LosAlamos.jpg/256px-JROppenheimer-LosAlamos.jpg", 
-                caption="J. Robert Oppenheimer at Los Alamos", width=200)
-    
-    # Get Oppenheimer's introduction if not already done
+    # Generate introduction on first run
     if not st.session_state.initialized:
-        with st.spinner("Initializing conversation with Dr. Oppenheimer..."):
+        with st.spinner("Awakening the consciousness of history..."):
             intro = st.session_state.time_machine.persona.get_introduction()
             st.session_state.conversation_history.append({
-                'type': 'oppenheimer',
-                'content': intro,
-                'timestamp': datetime.now()
+                'id': 'msg_intro', 'type': 'oppenheimer', 'content': intro, 'audio_path': None
             })
             st.session_state.initialized = True
+            st.rerun()
+
+    # --- Clean conversation display ---
+    chat_container = st.container()
+    with chat_container:
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        
+        for i, message in enumerate(st.session_state.conversation_history):
+            if message['type'] == 'user':
+                st.markdown(f"""
+                <div class="message message-user">
+                    <div class="message-content">
+                        {message['content']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:  # Oppenheimer's message
+                st.markdown(f"""
+                <div class="message message-assistant">
+                    <div class="message-content">
+                        {message['content']}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Show audio player if audio exists
+                audio_path = message.get('audio_path')
+                if audio_path and audio_path != 'pending' and os.path.exists(audio_path):
+                    st.audio(audio_path, format='audio/wav')
+        
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    # Display conversation history
-    st.markdown("### Conversation")
-    
-    for message in st.session_state.conversation_history:
-        if message['type'] == 'user':
-            st.markdown(f"""
-            <div class="user-message">
-                <strong>You:</strong> {message['content']}
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div class="oppenheimer-message">
-                <strong>Dr. Oppenheimer:</strong> {message['content']}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Display audio player if available
-            if 'audio_path' in message and message['audio_path'] and os.path.exists(message['audio_path']):
-                st.audio(message['audio_path'], format='audio/wav')
-    
-    # User input
+    # --- Input section ---
     st.markdown("### Ask Dr. Oppenheimer")
     
-    # Sample questions
-    st.markdown("**Suggested questions:**")
-    sample_questions = [
-        "What do you remember about the Trinity test?",
-        "Do you regret creating the atomic bomb?",
-        "Tell me about your time at Los Alamos",
-        "What did the Bhagavad Gita mean to you?",
-        "What was your relationship with Einstein like?"
-    ]
+    input_col1, input_col2 = st.columns([4, 1])
     
-    cols = st.columns(len(sample_questions))
-    for i, question in enumerate(sample_questions):
-        with cols[i]:
-            if st.button(f"💭 {question[:30]}...", key=f"sample_{i}"):
-                st.session_state.user_input = question
+    with input_col1:
+        user_input = st.text_area(
+            "Your question:", 
+            value=st.session_state.user_input,
+            key="user_input_box", 
+            placeholder="Ask about the Trinity test, quantum mechanics, or his philosophical reflections...", 
+            height=100,
+            label_visibility="collapsed"
+        )
     
-    # Text input
-    user_input = st.text_area(
-        "Your question to Dr. Oppenheimer:",
-        value=st.session_state.get('user_input', ''),
-        height=100,
-        placeholder="Ask about his life, the Manhattan Project, nuclear physics, or his philosophical views..."
-    )
+    with input_col2:
+        send_button = st.button("Send", type="primary", use_container_width=True)
     
-    # Submit button
-    if st.button("🎙️ Ask Dr. Oppenheimer", type="primary"):
-        if user_input.strip():
-            # Add user message to history
-            st.session_state.conversation_history.append({
-                'type': 'user',
-                'content': user_input,
-                'timestamp': datetime.now()
-            })
+    # Handle input submission
+    if send_button and user_input.strip():
+        # Add user message to history
+        st.session_state.conversation_history.append({'type': 'user', 'content': user_input.strip()})
+        
+        # Clear the input field for next message
+        st.session_state.user_input = ""
+        
+        # Show loading state while generating response
+        with st.spinner("Dr. Oppenheimer is contemplating your question..."):
+            # Generate text response
+            text_response = st.session_state.time_machine.persona.generate_response(user_input.strip())
             
-            # Process the conversation
-            with st.spinner("Dr. Oppenheimer is formulating his response..."):
-                try:
-                    text_response, audio_path, cost_info = st.session_state.time_machine.process_conversation(user_input)
-                    
-                    # Add Oppenheimer's response to history
-                    response_data = {
-                        'type': 'oppenheimer',
-                        'content': text_response,
-                        'audio_path': audio_path,
-                        'timestamp': datetime.now(),
-                        'cost_info': cost_info
-                    }
-                    st.session_state.conversation_history.append(response_data)
-                    
-                    # Show cost info if TTS was skipped
-                    if not cost_info.get('tts_enabled', True) and not cost_info.get('error'):
-                        optimization_source = response_data.get('cost_info', {}).get('optimization_source', 'unknown')
-                        st.info(f"🔇 Audio synthesis skipped for cost optimization "
-                               f"({cost_info['text_length']} chars, ${cost_info['estimated_cost']:.4f}) "
-                               f"[{optimization_source}]")
-                    
-                    # Clear input
-                    st.session_state.user_input = ''
-                    
-                    # Rerun to update display
-                    st.rerun()
-                    
-                except Exception as e:
-                    st.error(f"An error occurred: {e}")
-        else:
-            st.warning("Please enter a question or comment.")
+            # Add response to history with pending audio
+            response_message = {
+                'type': 'oppenheimer', 
+                'content': text_response, 
+                'audio_path': 'pending',
+                'id': f"msg_{len(st.session_state.conversation_history)}"
+            }
+            st.session_state.conversation_history.append(response_message)
+        
+        # Rerun to show the text response immediately
+        st.rerun()
+
+    # Handle audio synthesis for pending messages
+    for message in st.session_state.conversation_history:
+        if message['type'] == 'oppenheimer' and message.get('audio_path') == 'pending':
+            # Generate audio in background
+            audio_file = f"oppenheimer_response_{message['id']}.wav"
+            try:
+                with st.spinner("Synthesizing voice..."):
+                    audio_path = st.session_state.time_machine.tts.synthesize(message['content'], audio_file)
+                    message['audio_path'] = audio_path if audio_path else None
+                st.rerun()
+            except Exception as e:
+                logger.error(f"Audio synthesis failed: {e}")
+                message['audio_path'] = None
     
-    # Sidebar with information
+    # --- Enhanced Sidebar ---
     with st.sidebar:
-        st.markdown("### About J. Robert Oppenheimer")
+        st.markdown("## About")
         st.markdown("""
-        **Born:** April 22, 1904, New York City  
-        **Died:** February 18, 1967, Princeton, NJ  
+        Experience history through conversation. This AI recreates J. Robert Oppenheimer's 
+        voice, knowledge, and perspective from his lifetime (1904-1967).
         
-        **Key Roles:**
-        - Scientific Director, Manhattan Project
-        - Director, Institute for Advanced Study
-        - Professor, UC Berkeley
-        
-        **Famous For:**
-        - Leading development of atomic bomb
-        - Trinity test (July 16, 1945)
-        - "Now I am become Death" quote
-        - Post-war nuclear policy advocacy
+        **What to explore:**
+        - The Trinity test and Manhattan Project
+        - Nuclear physics and quantum mechanics  
+        - Moral philosophy and responsibility
+        - Relationships with Einstein, Bohr, and other scientists
+        - The security hearing and its aftermath
+        - Sanskrit literature and the Bhagavad Gita
         """)
         
-        st.markdown("### Historical Context")
-        st.markdown("""
-        This AI responds from Oppenheimer's historical perspective (1904-1967):
-        - World War II and Manhattan Project
-        - Early nuclear age and Cold War
-        - McCarthyism and security hearing (1954)
-        - Nuclear proliferation concerns
-        """)
+        st.markdown("---")
         
-        st.markdown("### Technology")
-        st.markdown("""
-        - **LLM:** Google Gemini 1.5 Flash
-        - **Knowledge Base:** RAG with ChromaDB
-        - **Voice:** Google Cloud TTS
-        - **Interface:** Streamlit
-        """)
-        
-        # Cost monitoring dashboard
-        if 'time_machine' in st.session_state:
-            st.markdown("### 💰 Cost Monitor")
-            optimizer = st.session_state.time_machine.persona.optimizer
-            
-            daily_usage = optimizer.daily_usage
-            max_chars = optimizer.max_daily_chars
-            usage_percent = (daily_usage / max_chars) * 100
-            
-            st.progress(usage_percent / 100)
-            st.caption(f"Daily usage: {daily_usage:,}/{max_chars:,} chars ({usage_percent:.1f}%)")
-            st.caption(f"Estimated cost: ${daily_usage * optimizer.cost_per_char:.4f}")
-            
-            # Response type breakdown
-            if st.session_state.conversation_history:
-                response_types = {}
-                total_cost = 0
-                for msg in st.session_state.conversation_history:
-                    if msg['type'] == 'oppenheimer' and 'cost_info' in msg:
-                        cost_info = msg['cost_info']
-                        if 'estimated_cost' in cost_info:
-                            total_cost += cost_info['estimated_cost']
-                
-                st.caption(f"Session cost: ${total_cost:.4f}")
-        
-        # Clear conversation button
-        if st.button("🔄 Start New Conversation"):
-            st.session_state.conversation_history = []
-            st.session_state.initialized = False
+        if st.button("Start Fresh Conversation", use_container_width=True):
+            # Clear all session state
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
             st.rerun()
+        
+        st.markdown("---")
+        st.markdown("""
+        <small>
+        <strong>Technical Details:</strong><br>
+        • AI Model: Google Gemini 2.5 Flash<br>
+        • Voice: Coqui TTS with voice cloning<br>
+        • Knowledge: RAG with historical documents<br>
+        • Response optimization for cost and quality
+        </small>
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
