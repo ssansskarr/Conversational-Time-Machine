@@ -1,0 +1,50 @@
+# Environment variables (contains API keys)
+.env
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+.Python
+
+# Virtual environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Generated audio files
+*.wav
+*.mp3
+*.mp4
+
+# ChromaDB database files (can be regenerated)
+chroma_db/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Analytics and usage data
+usage_analytics.json
+
+# Google Cloud credentials (if any)
+*.json
+!requirements.txt
