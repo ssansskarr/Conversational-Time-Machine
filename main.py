@@ -25,10 +25,10 @@ def main():
     """Main Streamlit application with a robust streaming response implementation."""
     st.set_page_config(
         page_title="The Conversational Time Machine: J. Robert Oppenheimer",
-        page_icon="⚛️",
+        page_icon="☁︎",
         layout="wide"
     )
-
+    
     # Custom CSS
     st.markdown("""
     <style>
@@ -37,17 +37,17 @@ def main():
         .oppenheimer-message { background: #fff3e0; padding: 0.5rem 1rem; border-radius: 10px; margin: 0.5rem 0; border-left: 3px solid #ff9800; }
     </style>
     """, unsafe_allow_html=True)
-
+    
     # Header
-    st.markdown('<div class="main-header"><h1>⚛️ The Conversational Time Machine</h1><h2>Speak with J. Robert Oppenheimer</h2></div>', unsafe_allow_html=True)
-
+    st.markdown('<div class="main-header"><h1>You Get to Speak with J. Robert Oppenheimer</h1><h2>Ask him anything you want</h2></div>', unsafe_allow_html=True)
+    
     # Initialize session state
     if 'time_machine' not in st.session_state:
         st.session_state.time_machine = ConversationalTimeMachine()
         st.session_state.conversation_history = []
         st.session_state.audio_job = None
         st.session_state.initialized = False
-
+    
     # Generate introduction on first run
     if not st.session_state.initialized:
         with st.spinner("Initializing conversation..."):
@@ -69,7 +69,7 @@ def main():
             
             # Create a placeholder for the audio player for this specific message
             placeholders[i] = st.empty()
-
+    
     # --- User input section ---
     user_input = st.text_area("Your question:", key="user_input_box", placeholder="Ask about his life, the Manhattan Project...", height=100)
     if st.button("🎙️ Ask", type="primary"):
@@ -100,22 +100,22 @@ def main():
                     with st.spinner("🎙️ Synthesizing voice..."):
                         audio_file = f"oppenheimer_response_{st.session_state.audio_job['id']}.wav"
                         new_audio_path = st.session_state.time_machine.tts.synthesize(st.session_state.audio_job['text'], audio_file)
-                        
+                    
                         # Update the history and clear the job
                         message['audio_path'] = new_audio_path
                         st.session_state.audio_job = None
-                        st.rerun()
-
+                    st.rerun()
+                    
             # If audio is ready, display it in the placeholder
             elif audio_path and os.path.exists(audio_path):
                 with placeholders[i]:
                     st.audio(audio_path, format='audio/wav')
-
+    
     # --- Sidebar ---
     with st.sidebar:
         st.markdown("### About This Experience")
         st.write("An AI-powered conversation with J. Robert Oppenheimer, featuring a locally cloned voice.")
-        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/JROppenheimer-LosAlamos.jpg/256px-JROppenheimer-LosAlamos.jpg", caption="J. Robert Oppenheimer")
+        # st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/0/09/JROppenheimer-LosAlamos.jpg/256px-JROppenheimer-LosAlamos.jpg", caption="J. Robert Oppenheimer")
 
         if st.button("🔄 Start New Conversation"):
             # A more robust way to clear state
