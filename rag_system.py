@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Set PyTorch to use CPU by default to avoid device issues
-torch.set_default_device('cpu')
+# torch.set_default_device('cpu')
 
 class OppenheimerRAG:
     def __init__(self):
