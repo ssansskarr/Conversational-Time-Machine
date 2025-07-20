@@ -16,13 +16,16 @@ ENV/
 env.bak/
 venv.bak/
 
-# Generated audio files
+# Generated audio files (ignore all except for voice samples)
 *.wav
+!knowledge_base/voice_samples/*.wav
 *.mp3
+!knowledge_base/voice_samples/*.mp3
 *.mp4
 
 # ChromaDB database files (can be regenerated)
-chroma_db/
+# We are including this for now to make setup easier for new users
+# chroma_db/
 
 # IDE files
 .vscode/
