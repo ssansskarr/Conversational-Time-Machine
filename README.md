@@ -8,7 +8,7 @@ This application creates an immersive conversational experience with J. Robert O
 
 ## How this project is the best one?
 
-This project demonstrates advanced AI system architecture through a dual AI approach where a primary Gemini model handles conversation generation while a secondary model optimizes response length based on query complexity and TTS cost-per-character analysis—reducing operational costs by 60% while maintaining engagement. The local voice cloning implementation using Coqui TTS eliminates expensive cloud dependencies, processing historical audio to create authentic voice characteristics that enhance historical immersion. An advanced RAG system with ChromaDB provides semantic search across curated historical documents, ensuring factually grounded responses, while a production-quality interface transcends typical Streamlit limitations through custom CSS animations and real-time audio synthesis integration.
+This project demonstrates advanced AI system architecture through a dual AI approach where a primary Gemini model handles conversation generation while a secondary model optimizes response length based on query complexity and TTS cost-per-character analysis—reducing operational costs. The local voice cloning implementation using Coqui TTS eliminates expensive cloud dependencies, processing historical audio to create authentic voice characteristics that enhance historical immersion. An advanced RAG system with ChromaDB provides semantic search across curated historical documents, ensuring factually grounded responses, while a production-quality interface transcends typical Streamlit limitations through custom CSS animations and real-time audio synthesis integration.
 
 
 ## How this project isn't the best one?
