@@ -1,3 +1,5 @@
+I will suggest to watch the video for the detailed explaination of my [approach and the demonstration.](https://drive.google.com/file/d/1c4keMidd2Wd4TE381K8v8h46PJmlIDTe/view?usp=drive_link)
+
 # The Conversational Time Machine: J. Robert Oppenheimer
 
 A voice-enabled AI application that recreates authentic conversations with J. Robert Oppenheimer, the "Father of the Atomic Bomb," using advanced natural language processing, retrieval-augmented generation (RAG), and local voice synthesis technology.
