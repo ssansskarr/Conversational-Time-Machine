@@ -6,7 +6,7 @@ A voice-enabled AI application that recreates authentic conversations with J. Ro
 
 This application creates an immersive conversational experience with J. Robert Oppenheimer by combining historical accuracy with modern AI technology. Users can engage in text-based conversations and receive both written and spoken responses that authentically represent Oppenheimer's voice, knowledge, and personality from his lifetime (1904-1967).
 
-### How this project is the best one?
+## How this project is the best one?
 
 This project demonstrates advanced AI system architecture through a dual AI approach where a primary Gemini model handles conversation generation while a secondary model optimizes response length based on query complexity and TTS cost-per-character analysis—reducing operational costs by 60% while maintaining engagement. The local voice cloning implementation using Coqui TTS eliminates expensive cloud dependencies, processing historical audio to create authentic voice characteristics that enhance historical immersion. An advanced RAG system with ChromaDB provides semantic search across curated historical documents, ensuring factually grounded responses, while a production-quality interface transcends typical Streamlit limitations through custom CSS animations and real-time audio synthesis integration.
 
